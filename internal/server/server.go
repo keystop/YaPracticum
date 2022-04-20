@@ -3,10 +3,10 @@ package server
 import (
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/keystop/YaPracticum.git/internal/global"
 	"github.com/keystop/YaPracticum.git/internal/handlers"
 	"github.com/keystop/YaPracticum.git/internal/middlewares"
-	"github.com/keystop/YaPracticum.git/internal/repository"
+	"github.com/go-chi/chi/v5"
 )
 
 type Server struct {
@@ -14,14 +14,17 @@ type Server struct {
 }
 
 //Start server with router.
-func (s *Server) Start(addr string, repo repository.Repository) {
+func (s *Server) Start(repo global.Repository, opt global.Options) {
 	r := chi.NewRouter()
-	r.Post("/", handlers.HandlerURLPost(repo))
+	baseURL := opt.RespBaseURL()
+	r.Post("/", handlers.ZipHandlerRead(handlers.ZipHandlerWrite(handlers.HandlerURLPost(repo, baseURL))))
 	r.Route("/{id}", func(r chi.Router) {
 		r.Use(middlewares.URLCtx)
 		r.Get("/", handlers.HandlerURLGet(repo))
 	})
-	s.Addr = addr
+	r.Post("/api/shorten", handlers.ZipHandlerRead(handlers.ZipHandlerWrite(handlers.HandlerAPIURLPost(repo, baseURL))))
+
+	s.Addr = opt.ServAddr()
 	s.Handler = r
 	s.ListenAndServe()
 }

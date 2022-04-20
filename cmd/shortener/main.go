@@ -1,12 +1,22 @@
 package main
 
 import (
+	"github.com/keystop/YaPracticum.git/internal/defoptions"
 	"github.com/keystop/YaPracticum.git/internal/repository"
+	"github.com/keystop/YaPracticum.git/internal/serialize"
 	"github.com/keystop/YaPracticum.git/internal/server"
+
 )
 
 func main() {
+	opt := defoptions.NewDefOptions()
+
+	urlRepo := repository.NewURLRepo()
+
+	serialize.NewSerialize(opt.RepoFileName())
+	serialize.ReadURLSFromFile(urlRepo)
+	repository.SerializeURLRepo = serialize.SaveURLSToFile
+
 	s := new(server.Server)
-	urlRepo := make(repository.URLRepo)
-	s.Start("localhost:8080", &urlRepo)
+	s.Start(urlRepo, opt)
 }
