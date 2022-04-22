@@ -56,8 +56,8 @@ var w *writer
 var r *reader
 var fileNametoSave string
 
-// SaveURLSToFile save local db to file.
-func SaveURLSToFile(rep global.Repository) {
+// SaveURLFile save local db to file.
+func SaveURLFile(rep global.Repository) {
 	var err error
 	w, err = newWriter(fileNametoSave)
 	if err != nil {
@@ -73,8 +73,8 @@ func ReadURLSFromFile(rep global.Repository) {
 	r.Close()
 }
 
-//NewSerialize init variables, that needed for package work.
-func NewSerialize(fileName string) {
+//New init variables, that needed for package work.
+func New(fileName string) {
 	var err error
 	fileNametoSave = fileName
 	r, err = newReader(fileName)

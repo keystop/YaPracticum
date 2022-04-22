@@ -3,10 +3,10 @@ package server
 import (
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/keystop/YaPracticum.git/internal/global"
 	"github.com/keystop/YaPracticum.git/internal/handlers"
 	"github.com/keystop/YaPracticum.git/internal/middlewares"
-	"github.com/go-chi/chi/v5"
 )
 
 type Server struct {
