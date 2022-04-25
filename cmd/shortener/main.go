@@ -1,21 +1,24 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/keystop/YaPracticum.git/internal/defoptions"
 	"github.com/keystop/YaPracticum.git/internal/repository"
-	"github.com/keystop/YaPracticum.git/internal/serialize"
 	"github.com/keystop/YaPracticum.git/internal/server"
 )
 
+// Main.
 func main() {
+
 	opt := defoptions.NewDefOptions()
-
-	urlRepo := repository.NewURLRepo()
-
-	serialize.New(opt.RepoFileName())
-	serialize.ReadURLSFromFile(urlRepo)
-	repository.SerializeURLRepo = serialize.SaveURLFile
-
+	sr, err := repository.NewServerRepo(opt.DBConnString())
+	if err != nil {
+		fmt.Println("Ошибка при подключении к БД: ", err)
+		return
+	}
+	// serverRepo := repository.NewRepo(opt.RepoFileName())
 	s := new(server.Server)
-	s.Start(urlRepo, opt)
+	s.Start(sr, opt)
+	defer sr.Close()
 }

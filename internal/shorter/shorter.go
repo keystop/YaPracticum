@@ -6,7 +6,7 @@ import (
 )
 
 //MakeShortner func for  hash.
-func MakeShortner(b []byte) string {
-	h := md5.Sum(b)
+func MakeShortner(s string) string {
+	h := md5.Sum([]byte(s))
 	return fmt.Sprintf("%x", h)
 }

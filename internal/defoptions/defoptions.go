@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/keystop/YaPracticum.git/internal/global"
+	"github.com/keystop/YaPracticum.git/internal/models"
 	"github.com/caarlos0/env/v6"
 )
 
@@ -13,6 +13,7 @@ type defOptions struct {
 	servAddr     string
 	baseURL      string
 	repoFileName string
+	dbConnString string
 }
 
 func (d defOptions) ServAddr() string {
@@ -27,10 +28,15 @@ func (d defOptions) RepoFileName() string {
 	return d.repoFileName
 }
 
+func (d defOptions) DBConnString() string {
+	return d.dbConnString
+}
+
 type EnvOptions struct {
 	ServAddr     string `env:"SERVER_ADDRESS"`
 	BaseURL      string `env:"BASE_URL"`
 	RepoFileName string `env:"FILE_STORAGE_PATH"`
+	DBConnString string `env:"DATABASE_DSN"`
 }
 
 //checkEnv for get options from env to default application options.
@@ -50,6 +56,9 @@ func (d *defOptions) checkEnv() {
 	if len(e.RepoFileName) != 0 {
 		d.repoFileName = e.RepoFileName
 	}
+	if len(e.DBConnString) != 0 {
+		d.dbConnString = e.DBConnString
+	}
 }
 
 //setFlags for get options from console to default application options.
@@ -61,11 +70,12 @@ func (d *defOptions) setFlags() {
 	flag.StringVar(&d.servAddr, "a", "localhost:8080", "a server address string")
 	flag.StringVar(&d.baseURL, "b", "http://localhost:8080", "a response address string")
 	flag.StringVar(&d.repoFileName, "f", appDir+`/local.gob`, "a file storage path string")
+	flag.StringVar(&d.dbConnString, "d", "user=kseikseich dbname=yap sslmode=disable", "a db connection string")
 	flag.Parse()
 }
 
 // NewDefOptions return obj like Options interfase.
-func NewDefOptions() global.Options {
+func NewDefOptions() models.Options {
 	opt := new(defOptions)
 	opt.setFlags()
 	opt.checkEnv()

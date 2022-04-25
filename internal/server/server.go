@@ -3,10 +3,10 @@ package server
 import (
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/keystop/YaPracticum.git/internal/global"
 	"github.com/keystop/YaPracticum.git/internal/handlers"
 	"github.com/keystop/YaPracticum.git/internal/middlewares"
+	"github.com/keystop/YaPracticum.git/internal/models"
+	"github.com/go-chi/chi/v5"
 )
 
 type Server struct {
@@ -14,15 +14,22 @@ type Server struct {
 }
 
 //Start server with router.
-func (s *Server) Start(repo global.Repository, opt global.Options) {
+func (s *Server) Start(repo models.Repository, opt models.Options) {
 	r := chi.NewRouter()
-	baseURL := opt.RespBaseURL()
-	r.Post("/", handlers.ZipHandlerRead(handlers.ZipHandlerWrite(handlers.HandlerURLPost(repo, baseURL))))
+	handlers.NewHandlers(repo, opt)
+	middlewares.NewCookie(repo)
+	r.Use(middlewares.SetCookieUser, middlewares.ZipHandlerRead, middlewares.ZipHandlerWrite)
+	//r.Use(middlewares.ZipHandlerRead, middlewares.ZipHandlerWrite)
+
+	r.Get("/user/urls", handlers.HandlerUserPostURLs)
+	r.Get("/ping", handlers.HandlerCheckDBConnect)
 	r.Route("/{id}", func(r chi.Router) {
 		r.Use(middlewares.URLCtx)
-		r.Get("/", handlers.HandlerURLGet(repo))
+		r.Get("/", handlers.HandlerURLGet)
 	})
-	r.Post("/api/shorten", handlers.ZipHandlerRead(handlers.ZipHandlerWrite(handlers.HandlerAPIURLPost(repo, baseURL))))
+	r.Post("/", handlers.HandlerURLPost)
+	r.Post("/api/shorten", handlers.HandlerAPIURLPost)
+	r.Post("/api/shorten/batch", handlers.HandlerAPIURLsPost)
 
 	s.Addr = opt.ServAddr()
 	s.Handler = r

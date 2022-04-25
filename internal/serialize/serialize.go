@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/keystop/YaPracticum.git/internal/global"
+	"github.com/keystop/YaPracticum.git/internal/models"
 )
 
 type reader struct {
@@ -56,25 +56,25 @@ var w *writer
 var r *reader
 var fileNametoSave string
 
-// SaveURLFile save local db to file.
-func SaveURLFile(rep global.Repository) {
+// SaveRepoToFile save local db to file.
+func SaveRepoToFile(rep models.Repository) {
 	var err error
 	w, err = newWriter(fileNametoSave)
 	if err != nil {
 		fmt.Println(err.Error())
 	}
-	w.encoder.Encode(rep.Get())
+	w.encoder.Encode(rep)
 	w.Close()
 }
 
-// ReadURLSFromFile read from local file to local base.
-func ReadURLSFromFile(rep global.Repository) {
-	r.decoder.Decode(rep.ToSet())
+// ReadRepoFromFile read from local file to local base.
+func ReadRepoFromFile(rep models.Repository) {
+	r.decoder.Decode(rep)
 	r.Close()
 }
 
-//New init variables, that needed for package work.
-func New(fileName string) {
+//NewSerialize init variables, that needed for package work.
+func NewSerialize(fileName string) {
 	var err error
 	fileNametoSave = fileName
 	r, err = newReader(fileName)
