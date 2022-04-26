@@ -13,16 +13,16 @@ func (s *ServerRepo) Close() {
 	s.db.Close()
 }
 
-func (s *ServerRepo) saveUrlsToDB(us []urlInfo, baseURL, userID string) error {
+func (s *ServerRepo) saveUrlsToDB(urls []urlInfo, baseURL, userID string) error {
 	db := s.db
 	ctx, cancelfunc := context.WithTimeout(s.ctx, 30*time.Second)
 	defer cancelfunc()
 
-	t, err := db.Begin()
+	transaction, err := db.Begin()
 	if err != nil {
 		return err
 	}
-	defer t.Rollback()
+	defer transaction.Rollback()
 
 	q := `INSERT INTO urls (
 		correlation_id,
@@ -31,21 +31,21 @@ func (s *ServerRepo) saveUrlsToDB(us []urlInfo, baseURL, userID string) error {
 		base_url,
 		user_id
 	  ) VALUES ($1,$2,$3,$4,(SELECT COALESCE(id, 0) FROM users where user_enc_id=$5))`
-	if len(us) > 1 {
+	if len(urls) > 1 {
 		q += ` ON CONFLICT (url) DO NOTHING`
 	}
 
-	pc, err := t.PrepareContext(ctx, q)
+	pc, err := transaction.PrepareContext(ctx, q)
 	if err != nil {
 		return err
 	}
 	defer pc.Close()
 
-	for _, u := range us {
+	for _, url := range urls {
 		if _, err := pc.ExecContext(ctx,
-			u.CorID,
-			u.Shorten,
-			u.Original,
+			url.CorID,
+			url.Shorten,
+			url.Original,
 			baseURL,
 			userID,
 		); err != nil {
@@ -53,7 +53,7 @@ func (s *ServerRepo) saveUrlsToDB(us []urlInfo, baseURL, userID string) error {
 		}
 	}
 
-	t.Commit()
+	transaction.Commit()
 
 	return nil
 
@@ -98,13 +98,13 @@ func (s *ServerRepo) createTables() error {
 	return nil
 }
 
-func NewServerRepo(c string) (*ServerRepo, error) {
-	db, err := sql.Open("postgres", c)
+func NewServerRepo(connectionString string) (*ServerRepo, error) {
+	db, err := sql.Open("postgres", connectionString)
 	if err != nil {
 		return nil, err
 	}
 	sr := &ServerRepo{
-		connStr: c,
+		connStr: connectionString,
 		db:      db,
 		ctx:     context.Background(),
 	}

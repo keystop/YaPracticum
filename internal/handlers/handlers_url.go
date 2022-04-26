@@ -21,18 +21,18 @@ func HandlerUserPostURLs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ud, err := Repo.GetUserURLs(userID)
+	userData, err := Repo.GetUserURLs(userID)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	if len(ud) == 0 {
+	if len(userData) == 0 {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 
-	res, err := json.Marshal(ud)
+	res, err := json.Marshal(userData)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return

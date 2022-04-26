@@ -52,14 +52,9 @@ func newReader(fileName string) (*reader, error) {
 
 }
 
-var w *writer
-var r *reader
-var fileNametoSave string
-
 // SaveRepoToFile save local db to file.
-func SaveRepoToFile(rep models.Repository) {
-	var err error
-	w, err = newWriter(fileNametoSave)
+func SaveRepoToFile(rep models.Repository, fileName string) {
+	w, err := newWriter(fileName)
 	if err != nil {
 		fmt.Println(err.Error())
 	}
@@ -68,18 +63,11 @@ func SaveRepoToFile(rep models.Repository) {
 }
 
 // ReadRepoFromFile read from local file to local base.
-func ReadRepoFromFile(rep models.Repository) {
-	r.decoder.Decode(rep)
-	r.Close()
-}
-
-//NewSerialize init variables, that needed for package work.
-func NewSerialize(fileName string) {
-	var err error
-	fileNametoSave = fileName
-	r, err = newReader(fileName)
+func ReadRepoFromFile(rep models.Repository, fileName string) {
+	r, err := newReader(fileName)
 	if err != nil {
 		fmt.Println(err.Error())
 	}
-
+	r.decoder.Decode(rep)
+	r.Close()
 }
