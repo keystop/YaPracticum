@@ -3,10 +3,10 @@ package server
 import (
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/keystop/YaPracticum.git/internal/handlers"
 	"github.com/keystop/YaPracticum.git/internal/middlewares"
 	"github.com/keystop/YaPracticum.git/internal/models"
-	"github.com/go-chi/chi/v5"
 )
 
 type Server struct {
@@ -21,13 +21,13 @@ func (s *Server) Start(repo models.Repository, opt models.Options) {
 	r.Use(middlewares.SetCookieUser, middlewares.ZipHandlerRead, middlewares.ZipHandlerWrite)
 	//r.Use(middlewares.ZipHandlerRead, middlewares.ZipHandlerWrite)
 
-	r.Get("/user/urls", handlers.HandlerUserPostURLs)
 	r.Get("/ping", handlers.HandlerCheckDBConnect)
 	r.Route("/{id}", func(r chi.Router) {
 		r.Use(middlewares.URLCtx)
 		r.Get("/", handlers.HandlerURLGet)
 	})
 	r.Post("/", handlers.HandlerURLPost)
+	r.Get("/api/user/urls", handlers.HandlerUserPostURLs)
 	r.Post("/api/shorten", handlers.HandlerAPIURLPost)
 	r.Post("/api/shorten/batch", handlers.HandlerAPIURLsPost)
 
