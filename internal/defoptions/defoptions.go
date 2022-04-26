@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/keystop/YaPracticum.git/internal/models"
 	"github.com/caarlos0/env/v6"
+	"github.com/keystop/YaPracticum.git/internal/models"
 )
 
 type defOptions struct {
@@ -32,53 +32,76 @@ func (d defOptions) DBConnString() string {
 	return d.dbConnString
 }
 
-type EnvOptions struct {
+type Config struct {
 	ServAddr     string `env:"SERVER_ADDRESS"`
 	BaseURL      string `env:"BASE_URL"`
 	RepoFileName string `env:"FILE_STORAGE_PATH"`
 	DBConnString string `env:"DATABASE_DSN"`
 }
 
+func (d *defOptions) fillFromConf(c *Config) {
+	if len(c.ServAddr) != 0 && len(d.servAddr) == 0 {
+		d.servAddr = c.ServAddr
+	}
+	if len(c.BaseURL) != 0 && len(d.baseURL) == 0 {
+		d.baseURL = c.BaseURL
+	}
+	if len(c.RepoFileName) != 0 && len(d.repoFileName) == 0 {
+		d.repoFileName = c.RepoFileName
+	}
+	if len(c.DBConnString) != 0 && len(d.dbConnString) == 0 {
+		d.dbConnString = c.DBConnString
+	}
+}
+
+func (d *defOptions) setDefault(appDir string) {
+
+	config := &Config{
+		"localhost:8080",
+		"http://localhost:8080",
+		appDir + `/local.gob`,
+		"user=kseikseich password=112233 dbname=yap sslmode=disable",
+	}
+	d.fillFromConf(config)
+}
+
 //checkEnv for get options from env to default application options.
 func (d *defOptions) checkEnv() {
 
-	e := &EnvOptions{}
+	e := &Config{}
 	err := env.Parse(e)
 	if err != nil {
 		fmt.Println(err.Error())
 	}
-	if len(e.ServAddr) != 0 {
-		d.servAddr = e.ServAddr
-	}
-	if len(e.BaseURL) != 0 {
-		d.baseURL = e.BaseURL
-	}
-	if len(e.RepoFileName) != 0 {
-		d.repoFileName = e.RepoFileName
-	}
-	if len(e.DBConnString) != 0 {
-		d.dbConnString = e.DBConnString
-	}
+	d.fillFromConf(e)
+
 }
 
 //setFlags for get options from console to default application options.
 func (d *defOptions) setFlags() {
+
+	flag.StringVar(&d.servAddr, "a", d.servAddr, "a server address string")
+	flag.StringVar(&d.baseURL, "b", d.baseURL, "a response address string")
+	flag.StringVar(&d.repoFileName, "f", d.repoFileName, "a file storage path string")
+	flag.StringVar(&d.dbConnString, "d", d.dbConnString, "a db connection string")
+
+	flag.Parse()
+
+}
+
+// NewDefOptions return obj like Options interfasc.
+func NewDefOptions() models.Options {
 	appDir, err := os.Getwd()
 	if err != nil {
 		fmt.Println("Не удалось найти каталог программы!")
 	}
-	flag.StringVar(&d.servAddr, "a", "localhost:8080", "a server address string")
-	flag.StringVar(&d.baseURL, "b", "http://localhost:8080", "a response address string")
-	flag.StringVar(&d.repoFileName, "f", appDir+`/local.gob`, "a file storage path string")
-	flag.StringVar(&d.dbConnString, "d", "user=kseikseich password=112233 dbname=yap sslmode=disable", "a db connection string")
-	flag.Parse()
-}
 
-// NewDefOptions return obj like Options interfase.
-func NewDefOptions() models.Options {
-	opt := new(defOptions)
+	opt := &defOptions{}
+
 	opt.setFlags()
 	opt.checkEnv()
-	fmt.Println(opt)
+
+	opt.setDefault(appDir)
+
 	return opt
 }
