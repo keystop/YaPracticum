@@ -17,8 +17,8 @@ func SetCookieUser(next http.Handler) http.Handler {
 		if err == nil {
 			cv = c.Value
 		}
-		if ok := Repo.FindUser(cv); !ok {
-			cv, err = Repo.CreateUser()
+		if ok := Repo.FindUser(r.Context(), cv); !ok {
+			cv, err = Repo.CreateUser(r.Context())
 			if err != nil {
 				fmt.Println("Can't create cookie", err)
 				next.ServeHTTP(w, r)

@@ -21,18 +21,18 @@ type RepoMock struct {
 	mock.Mock
 }
 
-func (m *RepoMock) SaveURL(url, baseURL, userID string) (string, error) {
-	args := m.Called(url, baseURL, userID)
+func (m *RepoMock) SaveURL(ctx context.Context, url, baseURL, userID string) (string, error) {
+	args := m.Called(ctx, url, baseURL, userID)
 	return args.String(0), args.Error(1)
 }
 
-func (m *RepoMock) SaveURLs(urls map[string]string, baseURL, userID string) (map[string]string, error) {
-	args := m.Called(urls, baseURL, userID)
+func (m *RepoMock) SaveURLs(ctx context.Context, urls map[string]string, baseURL, userID string) (map[string]string, error) {
+	args := m.Called(ctx, urls, baseURL, userID)
 	return args.Get(0).(map[string]string), args.Error(1)
 }
 
-func (m *RepoMock) GetURL(id string) (string, error) {
-	args := m.Called(id)
+func (m *RepoMock) GetURL(ctx context.Context, id string) (string, error) {
+	args := m.Called(ctx, id)
 	return args.String(0), args.Error(1)
 }
 
@@ -44,19 +44,23 @@ func (m *RepoMock) GetURL(id string) (string, error) {
 // 	return nil
 // }
 
-func (m *RepoMock) FindUser(string) bool {
+func (m *RepoMock) FindUser(context.Context, string) bool {
 	return false
 }
 
-func (m *RepoMock) CreateUser() (string, error) {
+func (m *RepoMock) CreateUser(context.Context) (string, error) {
 	return "", nil
 }
 
-func (m *RepoMock) GetUserURLs(string) ([]models.URLs, error) {
+func (m *RepoMock) GetUserURLs(context.Context, string) ([]models.URLs, error) {
 	return nil, nil
 }
 
-func (m *RepoMock) CheckDBConnection() error {
+func (m *RepoMock) CheckDBConnection(context.Context) error {
+	return nil
+}
+
+func (m *RepoMock) SetURLsToDel(context.Context, []string, string) error {
 	return nil
 }
 
@@ -118,16 +122,17 @@ func TestHandlerUrlGet(t *testing.T) {
 	handler := http.HandlerFunc(HandlerURLGet)
 
 	for key, value := range dataTests {
+
+		ctx := context.WithValue(context.Background(), models.URLID, value["reqID"].(string))
 		log.Println("start test", key)
 		var err error
 		if value["mockReturn2"] != nil {
 			err = value["mockReturn2"].(error)
 		}
-		repoMock.On("GetURL", value["reqID"].(string)).Return(value["mockReturn1"].(string), err)
+		repoMock.On("GetURL", ctx, value["reqID"].(string)).Return(value["mockReturn1"].(string), err)
 
 		r := httptest.NewRequest("GET", "/"+value["reqID"].(string), strings.NewReader(""))
 		w := httptest.NewRecorder()
-		ctx := context.WithValue(context.Background(), models.URLID, value["reqID"].(string))
 		handler.ServeHTTP(w, r.WithContext(ctx))
 
 		res := w.Result()
@@ -138,13 +143,13 @@ func TestHandlerUrlGet(t *testing.T) {
 }
 
 func TestHandlerUrlPost(t *testing.T) {
-	repoMock.On("SaveURL", "www.example.com", opt.RespBaseURL()+"/", "asdasd").Return(opt.RespBaseURL()+"/123123asdasd", nil)
+	ctx := context.WithValue(context.Background(), models.UserKey, "asdasd")
+	repoMock.On("SaveURL", ctx, "www.example.com", opt.RespBaseURL()+"/", "asdasd").Return(opt.RespBaseURL()+"/123123asdasd", nil)
 
 	handler := http.HandlerFunc(HandlerURLPost)
 	r := httptest.NewRequest("POST", "http://localhost:8080", strings.NewReader("www.example.com"))
 	w := httptest.NewRecorder()
 
-	ctx := context.WithValue(context.Background(), models.UserKey, "asdasd")
 	handler.ServeHTTP(w, r.WithContext(ctx))
 
 	res := w.Result()
@@ -165,13 +170,12 @@ func TestHandlerApiUrlPost(t *testing.T) {
 	if err != nil {
 		t.Error("Ошибка серилизации")
 	}
-
-	repoMock.On("SaveURL", "www.example.com", opt.RespBaseURL()+"/", "aasdasdSQW").Return(opt.RespBaseURL()+"/123123asdasd", nil)
+	ctx := context.WithValue(context.Background(), models.UserKey, "aasdasdSQW")
+	repoMock.On("SaveURL", ctx, "www.example.com", opt.RespBaseURL()+"/", "aasdasdSQW").Return(opt.RespBaseURL()+"/123123asdasd", nil)
 	handler := http.HandlerFunc(HandlerAPIURLPost)
 	r := httptest.NewRequest("POST", "http://localhost:8080", bytes.NewBuffer(bOut))
 	w := httptest.NewRecorder()
 
-	ctx := context.WithValue(context.Background(), models.UserKey, "aasdasdSQW")
 	handler.ServeHTTP(w, r.WithContext(ctx))
 	res := w.Result()
 	b, _ := io.ReadAll(res.Body)

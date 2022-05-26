@@ -17,11 +17,22 @@ import (
 
 var serializeURLRepo func(models.Repository)
 
+type delBufRow struct {
+	url string
+	id  int
+}
+
+type delBuf []delBufRow
+
 //UrlsData repository of urls. Realize Repository interface.
 type ServerRepo struct {
 	connStr string
 	db      *sql.DB
-	ctx     context.Context
+	cancel  context.CancelFunc
+	dBuf    delBuf
+	delCh   chan delBufRow
+	timer   *time.Timer
+	dur     time.Duration
 }
 
 type UsersRepo struct {
@@ -35,7 +46,7 @@ type urlInfo struct {
 	CorID    string
 }
 
-func (s *ServerRepo) SaveURL(url, baseURL, userID string) (string, error) {
+func (s *ServerRepo) SaveURL(ctx context.Context, url, baseURL, userID string) (string, error) {
 
 	r := shorter.MakeShortner(url)
 	u := urlInfo{
@@ -44,7 +55,7 @@ func (s *ServerRepo) SaveURL(url, baseURL, userID string) (string, error) {
 		CorID:    uuid.New().String(),
 	}
 	us := []urlInfo{u}
-	if err := s.saveUrlsToDB(us, baseURL, userID); err != nil {
+	if err := s.saveUrlsToDB(ctx, us, baseURL, userID); err != nil {
 		var e *pq.Error
 		if errors.As(err, &e) {
 			if e.Code == pgerrcode.UniqueViolation {
@@ -56,21 +67,66 @@ func (s *ServerRepo) SaveURL(url, baseURL, userID string) (string, error) {
 	return baseURL + r, nil
 }
 
-func (s *ServerRepo) GetURL(id string) (string, error) {
+func (s *ServerRepo) GetURL(ctx context.Context, id string) (string, error) {
 	db := s.db
-	ctx, cancelfunc := context.WithTimeout(s.ctx, 5*time.Second)
+	ctx, cancelfunc := context.WithTimeout(ctx, 5*time.Second)
 	defer cancelfunc()
-	q := `SELECT url FROM urls WHERE shorten_url=$1`
+	q := `SELECT url, for_delete FROM urls WHERE shorten_url=$1`
 	var url string
+	var forD bool
 	row := db.QueryRowContext(ctx, q, id)
 
-	if err := row.Scan(&url); err != nil {
+	if err := row.Scan(&url, &forD); err != nil {
 		return "", err
+	}
+	if forD {
+		return "", models.ErrURLSetToDel
 	}
 	return url, nil
 }
 
-func (s *ServerRepo) SaveURLs(u map[string]string, baseURL string, userID string) (map[string]string, error) {
+func (s *ServerRepo) SetURLsToDel(ctx context.Context, d []string, userID string) error {
+	db := s.db
+	ctx, cancelfunc := context.WithTimeout(ctx, 5*time.Second)
+	defer cancelfunc()
+
+	q := `SELECT id FROM users WHERE user_enc_id=$1`
+	var id int
+	row := db.QueryRowContext(ctx, q, userID)
+
+	if err := row.Scan(&id); err != nil {
+		return err
+	}
+	go func() {
+		for _, v := range d {
+			s.delCh <- delBufRow{v, id}
+		}
+	}()
+
+	return nil
+}
+
+func (s *ServerRepo) addURLToDel(ctx context.Context) {
+	timerCounter := 0
+	for {
+		select {
+		case <-s.timer.C:
+			timerCounter += 1
+			if timerCounter == 4 {
+				s.delUrls(ctx)
+				timerCounter = 0
+			}
+			s.flushDBuf(ctx)
+			s.timer.Reset(s.dur)
+		case v := <-s.delCh:
+			s.addDBuf(ctx, v)
+		}
+	}
+}
+
+// func (s *ServerRepo) AddTo
+
+func (s *ServerRepo) SaveURLs(ctx context.Context, u map[string]string, baseURL string, userID string) (map[string]string, error) {
 	var us []urlInfo
 	for k, v := range u {
 		r := shorter.MakeShortner(v)
@@ -82,16 +138,16 @@ func (s *ServerRepo) SaveURLs(u map[string]string, baseURL string, userID string
 		u[k] = baseURL + r
 		us = append(us, ui)
 	}
-	if err := s.saveUrlsToDB(us, baseURL, userID); err != nil {
+	if err := s.saveUrlsToDB(ctx, us, baseURL, userID); err != nil {
 
 		return u, err
 	}
 	return u, nil
 }
 
-func (s *ServerRepo) GetUserURLs(userEncID string) ([]models.URLs, error) {
+func (s *ServerRepo) GetUserURLs(ctx context.Context, userEncID string) ([]models.URLs, error) {
 	db := s.db
-	ctx, cancelfunc := context.WithTimeout(s.ctx, 5*time.Second)
+	ctx, cancelfunc := context.WithTimeout(ctx, 5*time.Second)
 	defer cancelfunc()
 	m := make([]models.URLs, 0)
 	q := `SELECT url, base_url || shorten_url from urls as u
@@ -118,9 +174,9 @@ func (s *ServerRepo) GetUserURLs(userEncID string) ([]models.URLs, error) {
 	return m, nil
 }
 
-func (s *ServerRepo) FindUser(userEncID string) (finded bool) {
+func (s *ServerRepo) FindUser(ctx context.Context, userEncID string) (finded bool) {
 	db := s.db
-	ctx, cancelfunc := context.WithTimeout(s.ctx, 5*time.Second)
+	ctx, cancelfunc := context.WithTimeout(ctx, 5*time.Second)
 	defer cancelfunc()
 	q := `SELECT id FROM users WHERE user_enc_id=$1`
 	var id int
@@ -135,9 +191,9 @@ func (s *ServerRepo) FindUser(userEncID string) (finded bool) {
 	return true
 }
 
-func (s *ServerRepo) CreateUser() (string, error) {
+func (s *ServerRepo) CreateUser(ctx context.Context) (string, error) {
 	db := s.db
-	ctx, cancelfunc := context.WithTimeout(s.ctx, 5*time.Second)
+	ctx, cancelfunc := context.WithTimeout(ctx, 5*time.Second)
 	defer cancelfunc()
 
 	ur := uuid.New()

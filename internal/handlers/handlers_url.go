@@ -21,18 +21,18 @@ func HandlerUserPostURLs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userData, err := Repo.GetUserURLs(userID)
+	ud, err := Repo.GetUserURLs(ctx, userID)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	if len(userData) == 0 {
+	if len(ud) == 0 {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 
-	res, err := json.Marshal(userData)
+	res, err := json.Marshal(ud)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -75,7 +75,7 @@ func HandlerAPIURLsPost(w http.ResponseWriter, r *http.Request) {
 		uts[u.CorID] = u.OriginURL
 	}
 
-	uts, err = Repo.SaveURLs(uts, BaseURL, userID)
+	uts, err = Repo.SaveURLs(ctx, uts, BaseURL, userID)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -108,14 +108,14 @@ func HandlerAPIURLsPost(w http.ResponseWriter, r *http.Request) {
 }
 
 func HandlerCheckDBConnect(w http.ResponseWriter, r *http.Request) {
-	if err := Repo.CheckDBConnection(); err != nil {
+	if err := Repo.CheckDBConnection(r.Context()); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
 }
 
-// HandlerURLPost saves url from request body to repository.
+// HandlerUrlPost saves url from request body to repository.
 func HandlerURLPost(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	userID, ok := ctx.Value(models.UserKey).(string)
@@ -131,7 +131,7 @@ func HandlerURLPost(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(err)
 		return
 	}
-	retURL, err := Repo.SaveURL(string(textBody), BaseURL, userID)
+	retURL, err := Repo.SaveURL(ctx, string(textBody), BaseURL, userID)
 	if err != nil {
 		if err == models.ErrConflictInsert {
 			w.Header().Add("Content-Type", r.Header.Get("Content-Type"))
@@ -175,7 +175,7 @@ func HandlerAPIURLPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	su, err := Repo.SaveURL(tURLJson.URLLong, BaseURL, userID)
+	su, err := Repo.SaveURL(ctx, tURLJson.URLLong, BaseURL, userID)
 	if err != nil {
 		switch err {
 		case models.ErrConflictInsert:
@@ -202,7 +202,7 @@ func HandlerAPIURLPost(w http.ResponseWriter, r *http.Request) {
 	w.Write(res)
 }
 
-// HandlerURLGet returns url from repository to resp.Head - "Location".
+// HandlerUrlGet returns url from repository to resp.Head - "Location".
 func HandlerURLGet(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -212,8 +212,12 @@ func HandlerURLGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	val, err := Repo.GetURL(id)
+	val, err := Repo.GetURL(ctx, id)
 	if err != nil {
+		if err == models.ErrURLSetToDel {
+			w.WriteHeader(http.StatusGone)
+			return
+		}
 		w.WriteHeader(http.StatusBadRequest)
 		io.WriteString(w, err.Error())
 		return
@@ -221,6 +225,42 @@ func HandlerURLGet(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Location", val)
 	w.Header().Add("Content-Type", r.Header.Get("Content-Type"))
 	w.WriteHeader(http.StatusTemporaryRedirect)
+}
+
+func HandlerDeleteUserUrls(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	userID, ok := ctx.Value(models.UserKey).(string)
+
+	if !ok {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	text, err := io.ReadAll(r.Body)
+	defer r.Body.Close()
+
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	dList := new([]string)
+
+	err = json.Unmarshal(text, dList)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	err = Repo.SetURLsToDel(ctx, *dList, userID)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Println(err)
+		return
+	}
+
+	w.WriteHeader(http.StatusAccepted)
 }
 
 func NewHandlers(repo models.Repository, opt models.Options) {

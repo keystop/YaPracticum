@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/caarlos0/env/v6"
 	"github.com/keystop/YaPracticum.git/internal/models"
+	"github.com/caarlos0/env/v6"
 )
 
 type defOptions struct {
